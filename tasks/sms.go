@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,8 +17,9 @@ import (
 
 const sleepTime = 1 * time.Minute
 
-//const callbackURL = "http://lk.kuskovo.biz"
-const callbackURL = "http://localhost:5757"
+const callbackURL = "http://lk.kuskovo.biz"
+
+//const callbackURL = "http://localhost:5757"
 
 func SNSSender(db *redis.Client, ctx *context.Context, errLog *log.Logger, infLog *log.Logger, wg *sync.WaitGroup) {
 	defer SNSSender(db, ctx, errLog, infLog, wg)
@@ -65,13 +67,19 @@ func SNSSender(db *redis.Client, ctx *context.Context, errLog *log.Logger, infLo
 							params := url.Values{}
 							params.Set("request_id", sms.ID())
 							params.Set("sms_api_id", data.SMSID)
-							params.Set("status_code", string(data.StatusCode))
+							params.Set("status_code", strconv.Itoa(data.StatusCode))
 							url := callbackURL + "/api/request/check/sms"
 							req, err := http.NewRequest("POST", url, strings.NewReader(params.Encode()))
 							if err != nil {
 								errLog.Print(err)
 							} else {
-								infLog.Println(req.Body)
+								req.Header.Set("content-type", "application/x-www-form-urlencoded")
+								resp, err := api.Client.Do(req)
+								if err != nil {
+									errLog.Print(err)
+								} else {
+									infLog.Print(resp.Body)
+								}
 							}
 						}
 					}
