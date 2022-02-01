@@ -3,8 +3,8 @@ package tasks
 import (
 	"context"
 	"encoding/json"
-	"github.com/arkoil/sms_service/sms"
-	"github.com/arkoil/sms_service/sms_ru"
+	"github.com/arkoil/sms_service/internal/sms"
+	"github.com/arkoil/sms_service/pkg/sms_ru"
 	"github.com/go-redis/redis/v8"
 	"log"
 	"net/http"

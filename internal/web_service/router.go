@@ -1,4 +1,4 @@
-package app
+package web_service
 
 import (
 	"github.com/gorilla/mux"

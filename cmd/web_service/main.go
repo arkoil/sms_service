@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/arkoil/sms_service/app"
-	"github.com/arkoil/sms_service/tasks"
+	"github.com/arkoil/sms_service/internal/web_service"
+	"github.com/arkoil/sms_service/internal/web_service/tasks"
 	"github.com/go-redis/redis/v8"
 	"log"
 	"net/http"
@@ -43,7 +43,7 @@ func main() {
 	defer rdb.Close()
 	defer wg.Wait()
 
-	myApp := app.Application{
+	myApp := web_service.Application{
 		errLog,
 		infLog,
 		rdb,
