@@ -1,4 +1,4 @@
-NAME_WEB=web_service
+NAME_WEB=sms_service
 
 build:
 	go build -o bin/${NAME_WEB} cmd/web_service/main.go
