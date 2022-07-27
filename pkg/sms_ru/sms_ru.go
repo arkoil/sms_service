@@ -14,11 +14,13 @@ type SMS interface {
 	ID() string
 }
 type APIHandler struct {
-	apiID   string
-	baseUrl string
-	Client  *http.Client
-	Test    bool
+	apiID        string
+	baseUrl      string
+	Client       *http.Client
+	test         bool
+	jsonResponse bool
 }
+
 type Response struct {
 	Status     string `json:"status"`
 	StatusCode int    `json:"status_code"`
@@ -43,14 +45,15 @@ func (err APIError) Error() string {
 	return err.Err
 }
 
-func NewAPIHandler(apiID string, client *http.Client, test bool) *APIHandler {
-	return &APIHandler{apiID: apiID, baseUrl: "https://sms.ru", Client: client, Test: test}
-}
-func (api *APIHandler) setBaseURL(baseUrl string) {
-	api.baseUrl = baseUrl
+func NewAPIHandler(apiID string, client *http.Client, opt ...Options) *APIHandler {
+	api := APIHandler{apiID: apiID, baseUrl: "https://sms.ru", Client: client}
+	for _, o := range opt {
+		api = o(api)
+	}
+	return &api
 }
 
-func (api APIHandler) SendSMSList(smsList *[]SMS, json bool) (string, error) {
+func (api APIHandler) SendSMSList(smsList *[]SMS) (string, error) {
 	var err error
 	err = APIError{}
 	clearRes := ""
@@ -67,10 +70,9 @@ func (api APIHandler) SendSMSList(smsList *[]SMS, json bool) (string, error) {
 	if err != nil {
 		return clearRes, err
 	}
-	//req.Header.Set("content-type", "application/x-www-form-urlencoded")
 	q := req.URL.Query()
 	q.Add("api_id", api.apiID)
-	if json {
+	if api.jsonResponse {
 		q.Add("json", "1")
 	}
 	req.Header.Set("content-type", "application/x-www-form-urlencoded")
