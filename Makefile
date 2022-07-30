@@ -1,9 +1,7 @@
-NAME_WEB=sms_service
+NAME_SERVICE=sms_service
 
 build:
-	go build -o bin/${NAME_WEB} cmd/web_service/main.go
-run_web:
-	./bin/${NAME_WEB}
+	go build -o bin/${NAME_SERVICE} cmd/${NAME_SERVICE}/main.go
 clean:
 	go clean
-	rm bin/${NAME_WEB}
+	rm bin/${NAME_SERVICE}
