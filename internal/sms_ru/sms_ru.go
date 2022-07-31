@@ -2,18 +2,20 @@ package sms_ru
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/arkoil/sms_service/internal/background"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
 type APIHandler struct {
+	Client       *http.Client
+	errLog       *log.Logger
+	infLog       *log.Logger
 	apiID        string
 	baseUrl      string
-	Client       *http.Client
 	test         bool
 	jsonResponse bool
 }
@@ -64,7 +66,7 @@ func (err APIError) Error() string {
 	return err.Err
 }
 
-func NewAPIHandler(apiID string, client *http.Client, opt ...Options) APIHandler {
+func NewAPIHandler(apiID string, client *http.Client, infLog *log.Logger, errLog *log.Logger, opt ...Options) APIHandler {
 	api := APIHandler{
 		apiID:   apiID,
 		baseUrl: "https://sms.ru",
@@ -85,7 +87,8 @@ func (api APIHandler) SendSMSList(smsList []background.SMS) (background.SMSAPIRe
 	err = APIError{}
 	response := ApiResponse{}
 	if len(smsList) == 0 {
-		return response, errors.New("sms list is empty")
+		api.infLog.Println("sms list is empty")
+		return response, nil
 	}
 	smsFromData := url.Values{}
 	for _, msg := range smsList {

@@ -58,6 +58,8 @@ func main() {
 	api := sms_ru.NewAPIHandler(
 		*smsRUAPIID,
 		cli,
+		infLog,
+		errLog,
 		sms_ru.WithTest(),
 		sms_ru.JSONFormat(),
 	)

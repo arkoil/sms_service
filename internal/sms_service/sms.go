@@ -5,32 +5,51 @@ import (
 	"net/http"
 )
 
-func (a Application) SendSMS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	p := make(map[string]string)
-	num := r.URL.Query().Get("number")
-	msg := r.URL.Query().Get("message")
-	requestID := r.URL.Query().Get("request_id")
-	p["number"] = num
-	p["message"] = msg
-	p["request_id"] = requestID
-	key := a.KeyPrefixToSend + requestID
-	p["key"] = key
-	jsonP, _ := json.Marshal(p)
-	err := a.DB.Set(*a.CTX, key, jsonP, 0).Err()
-	if err != nil {
-		a.ErrorLog.Print(err)
-		p["status"] = "Error"
-		p["error"] = err.Error()
-	} else {
-		a.InfoLog.Print("SMS added to the queue")
-		p["status"] = "OK"
-		p["result"] = "SMS added to the queue"
-	}
-	err = json.NewEncoder(w).Encode(p)
+func (a Application) errorResponse(errorMsg string, w http.ResponseWriter) {
+	a.ErrorLog.Print(errorMsg)
+	response := make(map[string]string)
+	response["status"] = "Error"
+	response["error"] = errorMsg
+	a.jsonResponse(response, w)
+}
+func (a Application) jsonResponse(response map[string]string, w http.ResponseWriter) {
+	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		a.ErrorLog.Fatal(err)
 	}
+
+}
+func (a Application) SendSMS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	message := make(map[string]string)
+	response := make(map[string]string)
+	message["number"] = r.URL.Query().Get("number")
+	message["message"] = r.URL.Query().Get("message")
+	message["request_id"] = r.URL.Query().Get("request_id")
+	if message["number"] == "" {
+		a.errorResponse("number is empty", w)
+		return
+	}
+	if message["message"] == "" {
+		a.errorResponse("message is empty", w)
+		return
+
+	}
+	if message["request_id"] == "" {
+		a.errorResponse("request_id is empty", w)
+		return
+	}
+	key := a.KeyPrefixToSend + message["request_id"]
+	jsonMessage, _ := json.Marshal(message)
+	err := a.DB.Set(*a.CTX, key, jsonMessage, 0).Err()
+	if err != nil {
+		a.errorResponse(err.Error(), w)
+	}
+	a.InfoLog.Print("SMS added to the queue")
+	response["status"] = "OK"
+	response["result"] = "SMS added to the queue"
+	a.jsonResponse(response, w)
+
 }
 
 func (a Application) CheckSMS(w http.ResponseWriter, r *http.Request) {
