@@ -54,23 +54,20 @@ func (a Application) SendSMS(w http.ResponseWriter, r *http.Request) {
 
 func (a Application) CheckSMS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	p := make(map[string]string)
+	response := make(map[string]string)
 	requestID := r.URL.Query().Get("request_id")
-	p["request_id"] = requestID
+	if requestID == "" {
+		a.errorResponse("request_id is empty", w)
+		return
+	}
 	key := a.KeyPrefixBeSend + requestID
 	redisResult, err := a.DB.Get(*a.CTX, key).Result()
 	if err != nil {
-		a.ErrorLog.Print(err)
-		p["status"] = "Error"
-		p["error"] = err.Error()
-	} else {
-		a.InfoLog.Print("SMS added in turn")
-		p["status"] = "OK"
-		p["result"] = redisResult
+		a.errorResponse(err.Error(), w)
+		return
 	}
-	err = json.NewEncoder(w).Encode(p)
-	if err != nil {
-		a.ErrorLog.Fatal(err)
-	}
-
+	a.InfoLog.Print("SMS added in turn")
+	response["status"] = "OK"
+	response["result"] = redisResult
+	a.jsonResponse(response, w)
 }
