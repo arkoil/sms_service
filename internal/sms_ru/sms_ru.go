@@ -3,6 +3,7 @@ package sms_ru
 import (
 	"encoding/json"
 	"github.com/arkoil/sms_service/internal/background"
+	"github.com/arkoil/sms_service/internal/store"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -77,12 +78,12 @@ func NewAPIHandler(apiID string, client *http.Client, infLog *log.Logger, errLog
 	}
 	return api
 }
-func (api APIHandler) SendSMS(sms background.SMS) (background.SMSAPIResponse, error) {
-	list := make([]background.SMS, 0, 1)
+func (api APIHandler) SendSMS(sms store.SMS) (background.SMSAPIResponse, error) {
+	list := make([]store.SMS, 0, 1)
 	list = append(list, sms)
 	return api.SendSMSList(list)
 }
-func (api APIHandler) SendSMSList(smsList []background.SMS) (background.SMSAPIResponse, error) {
+func (api APIHandler) SendSMSList(smsList []store.SMS) (background.SMSAPIResponse, error) {
 	var err error
 	err = APIError{}
 	response := ApiResponse{}

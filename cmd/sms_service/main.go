@@ -1,11 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"github.com/arkoil/sms_service/internal/sms_ru"
 	"github.com/arkoil/sms_service/internal/sms_service"
-	"github.com/go-redis/redis/v8"
+	"github.com/arkoil/sms_service/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -29,7 +27,6 @@ func main() {
 	flag.Parse()
 
 	//Variables
-	ctx := context.Background()
 	serverPort := strings.Join([]string{":", *port}, "")
 	errLog := log.New(os.Stdout, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	infLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime|log.Lshortfile)
@@ -44,14 +41,12 @@ func main() {
 		syscall.SIGQUIT,
 	)
 	//Redis client
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     *redisURL,
-		Password: *redisPassword,
-		DB:       *redisDB,
-	})
-
+	rdb, err := store.NewDB(*redisURL, *redisPassword, *redisDB, *keyPrefixToSend, *keyPrefixBeSend, *storaPeriod)
+	if err != nil {
+		errLog.Fatal(err)
+	}
 	//defers
-	defer rdb.Close()
+	defer rdb.Client.Close()
 	defer wg.Wait()
 	// initialize api handler
 	cli := &http.Client{} // TODO check the bad practice
@@ -65,16 +60,12 @@ func main() {
 	)
 	// initialize application
 	myApp := sms_service.Application{
-		ErrorLog:        errLog,
-		InfoLog:         infLog,
-		CTX:             &ctx,
-		APIsms:          api,
-		KeyPrefixToSend: *keyPrefixToSend,
-		KeyPrefixBeSend: *keyPrefixBeSend,
-		SendInterval:    *sendInterval,
-		DB:              rdb,
-		JobsWG:          &wg,
-		StorePeriod:     time.Duration(*storaPeriod),
+		ErrorLog:     errLog,
+		InfoLog:      infLog,
+		APIsms:       api,
+		SendInterval: *sendInterval,
+		DB:           rdb,
+		JobsWG:       &wg,
 	}
 	myApp.RunJobs()
 

@@ -1,36 +1,24 @@
 package background
 
 import (
-	"context"
-	"encoding/json"
-	"github.com/arkoil/sms_service/internal/sms"
-	"github.com/go-redis/redis/v8"
+	"github.com/arkoil/sms_service/internal/store"
 	"log"
 	"sync"
 	"time"
 )
 
 type SMSSendJob struct {
-	DB              *redis.Client
-	CTX             *context.Context
-	ApiHandler      SMSAPIHandler
-	keyPrefixToSend string
-	keyPrefixBeSend string
-	storePeriod     time.Duration
-	interval        time.Duration
-	infLog          *log.Logger
-	errLog          *log.Logger
+	DB         *store.DB
+	ApiHandler SMSAPIHandler
+	interval   time.Duration
+	infLog     *log.Logger
+	errLog     *log.Logger
 }
 
 type SMSJobOption func(j SMSSendJob) SMSSendJob
 
 // interfaces for use api
 
-type SMS interface {
-	Phone() string
-	Message() string
-	ID() string
-}
 type SMSAPIResponseItem interface {
 	GetID() string
 	GetStatus() string
@@ -41,8 +29,8 @@ type SMSAPIResponse interface {
 	Items() []SMSAPIResponseItem
 }
 type SMSAPIHandler interface {
-	SendSMSList([]SMS) (SMSAPIResponse, error)
-	SendSMS(SMS) (SMSAPIResponse, error)
+	SendSMSList([]store.SMS) (SMSAPIResponse, error)
+	SendSMS(store.SMS) (SMSAPIResponse, error)
 }
 
 // Set options functions
@@ -55,41 +43,14 @@ func SetInterval(s int) SMSJobOption {
 	}
 }
 
-// SetStorePeriod set option
-func SetStorePeriod(sp time.Duration) SMSJobOption {
-	return func(j SMSSendJob) SMSSendJob {
-		j.storePeriod = sp * time.Hour
-		return j
-	}
-}
-
-// SetKeyPrefixToSend set option
-func SetKeyPrefixToSend(pref string) SMSJobOption {
-	return func(j SMSSendJob) SMSSendJob {
-		j.keyPrefixToSend = pref
-		return j
-	}
-}
-
-// SetKeyPrefixBeSend set option
-func SetKeyPrefixBeSend(pref string) SMSJobOption {
-	return func(j SMSSendJob) SMSSendJob {
-		j.keyPrefixBeSend = pref
-		return j
-	}
-}
-
 // NewSMSSendJob create object
-func NewSMSSendJob(db *redis.Client, ctx *context.Context, api SMSAPIHandler, infLog *log.Logger, errLog *log.Logger, opt ...SMSJobOption) *SMSSendJob {
+func NewSMSSendJob(db *store.DB, api SMSAPIHandler, infLog *log.Logger, errLog *log.Logger, opt ...SMSJobOption) *SMSSendJob {
 	job := SMSSendJob{
-		DB:              db,
-		CTX:             ctx,
-		ApiHandler:      api,
-		keyPrefixToSend: "",
-		keyPrefixBeSend: "",
-		interval:        60 * time.Second,
-		infLog:          infLog,
-		errLog:          errLog,
+		DB:         db,
+		ApiHandler: api,
+		interval:   60 * time.Second,
+		infLog:     infLog,
+		errLog:     errLog,
 	}
 	for _, o := range opt {
 		job = o(job)
@@ -104,35 +65,19 @@ func (j *SMSSendJob) Task(wg *sync.WaitGroup) {
 	j.infLog.Print("SMS sending")
 	wg.Add(1)
 	defer wg.Done()
-	keys, err := j.DB.Keys(*j.CTX, j.keyPrefixToSend+"*").Result()
+	smsList, err := j.DB.GetSMSList()
 	if err != nil {
 		j.errLog.Fatal(err)
-	} else {
-
-		smsList := make([]SMS, 0)
-		for _, key := range keys {
-			jsonItem, _ := j.DB.Get(*j.CTX, key).Result()
-			item := sms.Item{}
-			err := json.Unmarshal([]byte(jsonItem), &item)
-			if err != nil {
-				j.errLog.Print(err)
-				continue
-			}
-			smsList = append(smsList, item)
-			j.DB.Del(*j.CTX, key)
-
-		}
-		result, err := j.ApiHandler.SendSMSList(smsList)
+	}
+	result, err := j.ApiHandler.SendSMSList(smsList)
+	if err != nil {
+		j.errLog.Fatal(err)
+	}
+	j.infLog.Printf("Response status %s", result.GetStatus())
+	for _, item := range result.Items() {
+		err = j.DB.SetSMSSent(item.GetID(), item.GetStatus())
 		if err != nil {
 			j.errLog.Fatal(err)
-		}
-		j.infLog.Printf("Response status %s", result.GetStatus())
-		for _, item := range result.Items() {
-			key := j.keyPrefixBeSend + item.GetID()
-			err := j.DB.Set(*j.CTX, key, item.GetStatus(), j.storePeriod).Err()
-			if err != nil {
-				j.errLog.Fatal(err)
-			}
 		}
 	}
 	j.infLog.Print("End SMS sending")
